@@ -1,10 +1,10 @@
 #![feature(prelude_import)]
 #![feature(print_internals)]
 #![allow(non_snake_case)]
-#[prelude_import]
-use std::prelude::rust_2021::*;
 #[macro_use]
 extern crate std;
+#[prelude_import]
+use std::prelude::rust_2021::*;
 use libc::wcslen;
 use std::ffi::c_void;
 use std::fmt;
@@ -40,30 +40,292 @@ extern "system" fn DllCanUnloadNow() -> HRESULT {
     S_OK
 }
 
-#[implement(IAntimalwareProvider)]
+#[repr(C)]
+struct RustAmsiProvider_Impl {
+    identity: *const ::windows_core::IInspectable_Vtbl,
+    vtables: (*const <IAntimalwareProvider as ::windows_core::Interface>::Vtable,),
+    this: RustAmsiProvider,
+    count: ::windows_core::imp::WeakRefCount,
+}
+impl RustAmsiProvider_Impl {
+    const VTABLES: (<IAntimalwareProvider as ::windows_core::Interface>::Vtable,) = (
+        <IAntimalwareProvider as ::windows_core::Interface>::Vtable::new::<
+            Self,
+            RustAmsiProvider,
+            -1,
+        >(),
+    );
+    const IDENTITY: ::windows_core::IInspectable_Vtbl =
+        ::windows_core::IInspectable_Vtbl::new::<Self, IAntimalwareProvider, 0>();
+    fn new(this: RustAmsiProvider) -> Self {
+        Self {
+            identity: &Self::IDENTITY,
+            vtables: (&Self::VTABLES.0,),
+            this,
+            count: ::windows_core::imp::WeakRefCount::new(),
+        }
+    }
+}
+impl ::windows_core::IUnknownImpl for RustAmsiProvider_Impl {
+    type Impl = RustAmsiProvider;
+    fn get_impl(&self) -> &Self::Impl {
+        &self.this
+    }
+    unsafe fn QueryInterface(
+        &self,
+        iid: *const ::windows_core::GUID,
+        interface: *mut *mut ::core::ffi::c_void,
+    ) -> ::windows_core::HRESULT {
+        println!("RustAmsiProvider_Impl::QueryInterface");
+        if iid.is_null() || interface.is_null() {
+            return ::windows_core::HRESULT(-2147467261);
+        }
+        let iid = &*iid;
+        *interface = if iid == &<::windows_core::IUnknown as ::windows_core::Interface>::IID
+            || iid == &<::windows_core::IInspectable as ::windows_core::Interface>::IID
+            || iid == &<::windows_core::imp::IAgileObject as ::windows_core::Interface>::IID
+        {
+            println!("RustAmsiProvider_Impl::QueryInterface IUnknown");
+            &self.identity as *const _ as *mut _
+        } else if <IAntimalwareProvider as ::windows_core::Interface>::Vtable::matches(iid) {
+            println!("RustAmsiProvider_Impl::QueryInterface IAntimalwareProvider");
+            &self.vtables.0 as *const _ as *mut _
+        } else {
+            println!("RustAmsiProvider_Impl::QueryInterface null");
+            ::core::ptr::null_mut()
+        };
+        if !(*interface).is_null() {
+            self.count.add_ref();
+            return ::windows_core::HRESULT(0);
+        }
+        *interface = self.count.query(iid, &self.identity as *const _ as *mut _);
+        if (*interface).is_null() {
+            ::windows_core::HRESULT(-2147467262)
+        } else {
+            ::windows_core::HRESULT(0)
+        }
+    }
+    fn AddRef(&self) -> u32 {
+        self.count.add_ref()
+    }
+    unsafe fn Release(&self) -> u32 {
+        let remaining = self.count.release();
+        if remaining == 0 {
+            _ = ::std::boxed::Box::from_raw(self as *const Self as *mut Self);
+        }
+        remaining
+    }
+    unsafe fn GetTrustLevel(&self, value: *mut i32) -> ::windows_core::HRESULT {
+        if value.is_null() {
+            return ::windows_core::HRESULT(-2147467261);
+        }
+        *value = 0;
+        ::windows_core::HRESULT(0)
+    }
+}
+impl RustAmsiProvider {
+    #[doc = r" Try casting as the provided interface"]
+    #[doc = r""]
+    #[doc = r" # Safety"]
+    #[doc = r""]
+    #[doc = r" This function can only be safely called if `self` has been heap allocated and pinned using"]
+    #[doc = r" the mechanisms provided by `implement` macro."]
+    unsafe fn cast<I: ::windows_core::Interface>(&self) -> ::windows_core::Result<I> {
+        let boxed = (self as *const _ as *const *mut ::core::ffi::c_void).sub(1 + 1)
+            as *mut RustAmsiProvider_Impl;
+        let mut result = ::std::ptr::null_mut();
+        _ = <RustAmsiProvider_Impl as ::windows_core::IUnknownImpl>::QueryInterface(
+            &*boxed,
+            &I::IID,
+            &mut result,
+        );
+        ::windows_core::Type::from_abi(result)
+    }
+}
+impl ::core::convert::From<RustAmsiProvider> for ::windows_core::IUnknown {
+    fn from(this: RustAmsiProvider) -> Self {
+        let this = RustAmsiProvider_Impl::new(this);
+        let boxed = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        unsafe { ::core::mem::transmute(&boxed.identity) }
+    }
+}
+impl ::core::convert::From<RustAmsiProvider> for ::windows_core::IInspectable {
+    fn from(this: RustAmsiProvider) -> Self {
+        let this = RustAmsiProvider_Impl::new(this);
+        let boxed = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        unsafe { ::core::mem::transmute(&boxed.identity) }
+    }
+}
+impl ::core::convert::From<RustAmsiProvider> for IAntimalwareProvider {
+    fn from(this: RustAmsiProvider) -> Self {
+        let this = RustAmsiProvider_Impl::new(this);
+        let mut this = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        let vtable_ptr = &this.vtables.0;
+        unsafe { ::core::mem::transmute(vtable_ptr) }
+    }
+}
+impl ::windows_core::AsImpl<RustAmsiProvider> for IAntimalwareProvider {
+    unsafe fn as_impl(&self) -> &RustAmsiProvider {
+        let this = ::windows_core::Interface::as_raw(self);
+        let this = (this as *mut *mut ::core::ffi::c_void).sub(1 + 0) as *mut RustAmsiProvider_Impl;
+        &(*this).this
+    }
+}
 struct RustAmsiProvider {}
 
 impl IAntimalwareProvider_Impl for RustAmsiProvider {
     fn Scan(&self, _stream: Option<&IAmsiStream>) -> Result<AMSI_RESULT> {
-        println!("Scan");
+        {
+            ::std::io::_print(format_args!("Scan\n"));
+        };
         Ok(AMSI_RESULT_CLEAN)
     }
-
     fn CloseSession(&self, _session: u64) {
-        println!("CloseSession");
+        {
+            ::std::io::_print(format_args!("CloseSession\n"));
+        };
     }
-
     fn DisplayName(&self) -> Result<PWSTR> {
-        println!("DisplayName");
+        {
+            ::std::io::_print(format_args!("DisplayName\n"));
+        };
         Ok(PWSTR(unsafe {
             U16CString::from_str_unchecked("RustAmsiProvider").as_mut_ptr()
         }))
     }
 }
-
-#[implement(IClassFactory)]
+#[repr(C)]
+struct RustAmsiProviderFactory_Impl {
+    identity: *const ::windows_core::IInspectable_Vtbl,
+    vtables: (*const <IClassFactory as ::windows_core::Interface>::Vtable,),
+    this: RustAmsiProviderFactory,
+    count: ::windows_core::imp::WeakRefCount,
+}
+impl RustAmsiProviderFactory_Impl {
+    const VTABLES: (<IClassFactory as ::windows_core::Interface>::Vtable,) =
+        (<IClassFactory as ::windows_core::Interface>::Vtable::new::<
+            Self,
+            RustAmsiProviderFactory,
+            -1,
+        >(),);
+    const IDENTITY: ::windows_core::IInspectable_Vtbl =
+        ::windows_core::IInspectable_Vtbl::new::<Self, IClassFactory, 0>();
+    fn new(this: RustAmsiProviderFactory) -> Self {
+        Self {
+            identity: &Self::IDENTITY,
+            vtables: (&Self::VTABLES.0,),
+            this,
+            count: ::windows_core::imp::WeakRefCount::new(),
+        }
+    }
+}
+impl ::windows_core::IUnknownImpl for RustAmsiProviderFactory_Impl {
+    type Impl = RustAmsiProviderFactory;
+    fn get_impl(&self) -> &Self::Impl {
+        &self.this
+    }
+    unsafe fn QueryInterface(
+        &self,
+        iid: *const ::windows_core::GUID,
+        interface: *mut *mut ::core::ffi::c_void,
+    ) -> ::windows_core::HRESULT {
+        println!("RustAmsiProviderFactory_Impl::QueryInterface");
+        if iid.is_null() || interface.is_null() {
+            return ::windows_core::HRESULT(-2147467261);
+        }
+        let iid = &*iid;
+        *interface = if iid == &<::windows_core::IUnknown as ::windows_core::Interface>::IID
+            || iid == &<::windows_core::IInspectable as ::windows_core::Interface>::IID
+            || iid == &<::windows_core::imp::IAgileObject as ::windows_core::Interface>::IID
+        {
+            println!("RustAmsiProviderFactory_Impl::QueryInterface IUnknown");
+            &self.identity as *const _ as *mut _
+        } else if <IClassFactory as ::windows_core::Interface>::Vtable::matches(iid) {
+            println!("RustAmsiProviderFactory_Impl::QueryInterface IClassFactory");
+            &self.vtables.0 as *const _ as *mut _
+        } else {
+            println!("RustAmsiProviderFactory_Impl::QueryInterface null");
+            ::core::ptr::null_mut()
+        };
+        if !(*interface).is_null() {
+            self.count.add_ref();
+            return ::windows_core::HRESULT(0);
+        }
+        *interface = self.count.query(iid, &self.identity as *const _ as *mut _);
+        if (*interface).is_null() {
+            ::windows_core::HRESULT(-2147467262)
+        } else {
+            ::windows_core::HRESULT(0)
+        }
+    }
+    fn AddRef(&self) -> u32 {
+        self.count.add_ref()
+    }
+    unsafe fn Release(&self) -> u32 {
+        let remaining = self.count.release();
+        if remaining == 0 {
+            _ = ::std::boxed::Box::from_raw(self as *const Self as *mut Self);
+        }
+        remaining
+    }
+    unsafe fn GetTrustLevel(&self, value: *mut i32) -> ::windows_core::HRESULT {
+        if value.is_null() {
+            return ::windows_core::HRESULT(-2147467261);
+        }
+        *value = 0;
+        ::windows_core::HRESULT(0)
+    }
+}
+impl RustAmsiProviderFactory {
+    #[doc = r" Try casting as the provided interface"]
+    #[doc = r""]
+    #[doc = r" # Safety"]
+    #[doc = r""]
+    #[doc = r" This function can only be safely called if `self` has been heap allocated and pinned using"]
+    #[doc = r" the mechanisms provided by `implement` macro."]
+    unsafe fn cast<I: ::windows_core::Interface>(&self) -> ::windows_core::Result<I> {
+        let boxed = (self as *const _ as *const *mut ::core::ffi::c_void).sub(1 + 1)
+            as *mut RustAmsiProviderFactory_Impl;
+        let mut result = ::std::ptr::null_mut();
+        _ = <RustAmsiProviderFactory_Impl as ::windows_core::IUnknownImpl>::QueryInterface(
+            &*boxed,
+            &I::IID,
+            &mut result,
+        );
+        ::windows_core::Type::from_abi(result)
+    }
+}
+impl ::core::convert::From<RustAmsiProviderFactory> for ::windows_core::IUnknown {
+    fn from(this: RustAmsiProviderFactory) -> Self {
+        let this = RustAmsiProviderFactory_Impl::new(this);
+        let boxed = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        unsafe { ::core::mem::transmute(&boxed.identity) }
+    }
+}
+impl ::core::convert::From<RustAmsiProviderFactory> for ::windows_core::IInspectable {
+    fn from(this: RustAmsiProviderFactory) -> Self {
+        let this = RustAmsiProviderFactory_Impl::new(this);
+        let boxed = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        unsafe { ::core::mem::transmute(&boxed.identity) }
+    }
+}
+impl ::core::convert::From<RustAmsiProviderFactory> for IClassFactory {
+    fn from(this: RustAmsiProviderFactory) -> Self {
+        let this = RustAmsiProviderFactory_Impl::new(this);
+        let mut this = ::core::mem::ManuallyDrop::new(::std::boxed::Box::new(this));
+        let vtable_ptr = &this.vtables.0;
+        unsafe { ::core::mem::transmute(vtable_ptr) }
+    }
+}
+impl ::windows_core::AsImpl<RustAmsiProviderFactory> for IClassFactory {
+    unsafe fn as_impl(&self) -> &RustAmsiProviderFactory {
+        let this = ::windows_core::Interface::as_raw(self);
+        let this =
+            (this as *mut *mut ::core::ffi::c_void).sub(1 + 0) as *mut RustAmsiProviderFactory_Impl;
+        &(*this).this
+    }
+}
 struct RustAmsiProviderFactory {}
-
 impl IClassFactory_Impl for RustAmsiProviderFactory {
     fn CreateInstance(
         &self,
@@ -71,35 +333,41 @@ impl IClassFactory_Impl for RustAmsiProviderFactory {
         riid: *const GUID,
         ppv: *mut *mut c_void,
     ) -> Result<()> {
-        println!("CreateInstance");
-        let provider: Pin<Box<IAntimalwareProvider>> = Box::pin(RustAmsiProvider {}.into());
-        let provider: ManuallyDrop<Pin<Box<IAntimalwareProvider>>> = ManuallyDrop::new(provider);
+        {
+            ::std::io::_print(format_args!("CreateInstance\n"));
+        };
+        let provider: ManuallyDrop<Pin<Box<RustAmsiProvider_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProvider_Impl::new(RustAmsiProvider {})));
         unsafe {
-            *ppv = std::mem::transmute(provider);
+            provider.QueryInterface(riid, ppv);
         }
-        println!("*ppv: {:?}", unsafe { *ppv });
+        {
+            ::std::io::_print(format_args!("CreateInstance *ppv: {0:?}\n", unsafe { *ppv }));
+        };
         Ok(())
     }
-
     fn LockServer(&self, _lock: BOOL) -> Result<()> {
-        println!("LockServer");
+        {
+            ::std::io::_print(format_args!("LockServer\n"));
+        };
         Ok(())
     }
 }
-
 #[no_mangle]
 extern "system" fn DllGetClassObject(
     rclsid: *const GUID,
     riid: *const GUID,
     ppv: *mut *mut c_void,
 ) -> HRESULT {
-    println!("DllGetClassObject");
-
-    let factory = RustAmsiProviderFactory {};
-    let factory: Pin<Box<RustAmsiProviderFactory>> = Box::pin(factory);
-    let factory: ManuallyDrop<Pin<Box<RustAmsiProviderFactory>>> = ManuallyDrop::new(factory);
-    println!("*ppv: {:?}", unsafe { *ppv });
-
+    {
+        ::std::io::_print(format_args!("DllGetClassObject\n"));
+    };
+    let factory: ManuallyDrop<Pin<Box<RustAmsiProviderFactory_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProviderFactory_Impl::new(RustAmsiProviderFactory {})));
+    unsafe {
+        factory.QueryInterface(riid, ppv);
+    }
+    {
+        ::std::io::_print(format_args!("DllGetClassObject *ppv: {0:?}\n", unsafe { *ppv }));
+    };
     return S_OK;
 }
 #[no_mangle]
