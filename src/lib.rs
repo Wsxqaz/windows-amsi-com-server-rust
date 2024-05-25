@@ -25,9 +25,7 @@ use windows::Win32::System::SystemServices::*;
 #[no_mangle]
 extern "system" fn DllMain(dll_module: HMODULE, call_reason: u32, _: *mut ()) -> bool {
     match call_reason {
-        DLL_PROCESS_ATTACH => unsafe {
-            CURRENT_MODULE = Some(dll_module);
-        },
+        DLL_PROCESS_ATTACH => {},
         DLL_PROCESS_DETACH => {}
         _ => {}
     }
