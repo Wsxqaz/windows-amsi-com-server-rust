@@ -1,4 +1,4 @@
-# windows-amsi-com-server-rust
+# windows-amsi-provider-rust
 
 ## references
 
