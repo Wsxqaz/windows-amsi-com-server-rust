@@ -7,13 +7,17 @@ use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::ptr;
 use widestring::*;
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::System::Antimalware::*;
-use windows::Win32::System::Com::*;
-use windows::Win32::System::Registry::*;
-use windows::Win32::System::SystemServices::*;
+use windows::core::{implement, IUnknown, IUnknownImpl, Result, GUID, HRESULT, PCWSTR, PWSTR};
+use windows::Win32::Foundation::{BOOL, E_FAIL, HMODULE, MAX_PATH, S_OK};
+use windows::Win32::System::Antimalware::{
+    IAmsiStream, IAntimalwareProvider, IAntimalwareProvider_Impl, AMSI_RESULT, AMSI_RESULT_CLEAN,
+};
+use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
+use windows::Win32::System::Registry::{
+    RegDeleteTreeW, RegSetKeyValueW, HKEY_LOCAL_MACHINE, REG_SZ,
+};
+use windows::Win32::System::SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH};
 
 const CLSID: &str = "{f3d06e7c-1e45-4a26-847e-f9fcdee59be1}";
 static mut DLL_MODULE: Option<HMODULE> = None;
@@ -26,7 +30,7 @@ extern "system" fn DllMain(dll_module: HMODULE, call_reason: u32, _: *mut ()) ->
             unsafe {
                 DLL_MODULE = Some(dll_module);
             }
-        },
+        }
         DLL_PROCESS_DETACH => {}
         _ => {}
     }
@@ -50,7 +54,6 @@ impl IAntimalwareProvider_Impl for RustAmsiProvider {
     }
     fn DisplayName(&self) -> Result<PWSTR> {
         log::info!("IAntimalwareProvider_Impl::DisplayName");
-
         Ok(PWSTR(unsafe {
             U16CString::from_str_unchecked("RustAmsiProvider").as_mut_ptr()
         }))
@@ -67,10 +70,9 @@ impl IClassFactory_Impl for RustAmsiProviderFactory {
         ppv: *mut *mut c_void,
     ) -> Result<()> {
         log::info!("IClassFactory_Impl::CreateInstance");
-        let provider: ManuallyDrop<Pin<Box<RustAmsiProvider_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProvider_Impl::new(RustAmsiProvider {})));
-        let _ = unsafe {
-            provider.QueryInterface(riid, ppv)
-        };
+        let provider: ManuallyDrop<Pin<Box<RustAmsiProvider_Impl>>> =
+            ManuallyDrop::new(Box::pin(RustAmsiProvider_Impl::new(RustAmsiProvider {})));
+        let _ = unsafe { provider.QueryInterface(riid, ppv) };
         Ok(())
     }
     fn LockServer(&self, _lock: BOOL) -> Result<()> {
@@ -85,12 +87,12 @@ extern "system" fn DllGetClassObject(
     riid: *const GUID,
     ppv: *mut *mut c_void,
 ) -> HRESULT {
-
     log::info!("DllGetClassObject");
-    let factory: ManuallyDrop<Pin<Box<RustAmsiProviderFactory_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProviderFactory_Impl::new(RustAmsiProviderFactory {})));
-    let _ = unsafe {
-        factory.QueryInterface(riid, ppv)
-    };
+    let factory: ManuallyDrop<Pin<Box<RustAmsiProviderFactory_Impl>>> =
+        ManuallyDrop::new(Box::pin(RustAmsiProviderFactory_Impl::new(
+            RustAmsiProviderFactory {},
+        )));
+    let _ = unsafe { factory.QueryInterface(riid, ppv) };
     return S_OK;
 }
 
@@ -99,7 +101,8 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     let def_clsid_path = format!("Software\\Classes\\CLSID\\{0}", CLSID);
     let def_clsid_path = U16CString::from_str(def_clsid_path).unwrap();
     let def_clsid_path_value = U16CString::from_str("RustAmsiProvider").unwrap();
-    let def_clsid_path_value_len = unsafe {  ((wcslen(def_clsid_path_value.as_ptr()) + 1) * 2) as u32 };
+    let def_clsid_path_value_len =
+        unsafe { ((wcslen(def_clsid_path_value.as_ptr()) + 1) * 2) as u32 };
     let resp = unsafe {
         RegSetKeyValueW(
             HKEY_LOCAL_MACHINE,
@@ -120,12 +123,7 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     let def_clsid_inproc_path_value = {
         if let Some(dll_module) = unsafe { DLL_MODULE } {
             let mut path = [0u16; MAX_PATH as usize];
-            let len = unsafe {
-                GetModuleFileNameW(
-                    dll_module,
-                    &mut path
-                )
-            };
+            let len = unsafe { GetModuleFileNameW(dll_module, &mut path) };
             if len != 0 {
                 let path = unsafe { U16CString::from_raw(path.as_mut_ptr()) };
                 path
@@ -154,7 +152,8 @@ extern "system" fn DllRegisterServer() -> HRESULT {
         return resp;
     }
 
-    let def_clsid_inproc_threading_path = format!("Software\\Classes\\CLSID\\{0}\\InProcServer32", CLSID);
+    let def_clsid_inproc_threading_path =
+        format!("Software\\Classes\\CLSID\\{0}\\InProcServer32", CLSID);
     let def_clsid_inproc_threading_path =
         U16CString::from_str(def_clsid_inproc_threading_path).unwrap();
     let def_clsid_inproc_threading_key = U16CString::from_str("ThreadingModel").unwrap();
