@@ -13,12 +13,19 @@ use windows::Win32::System::Antimalware::*;
 use windows::Win32::System::Com::*;
 use windows::Win32::System::Registry::*;
 use windows::Win32::System::SystemServices::*;
+use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
+
+const CLSID: &str = "{f3d06e7c-1e45-4a26-847e-f9fcdee59be1}";
+static mut DLL_MODULE: Option<HMODULE> = None;
 
 #[no_mangle]
-extern "system" fn DllMain(_dll_module: HMODULE, call_reason: u32, _: *mut ()) -> bool {
+extern "system" fn DllMain(dll_module: HMODULE, call_reason: u32, _: *mut ()) -> bool {
     match call_reason {
         DLL_PROCESS_ATTACH => {
             let _ = env_logger::try_init();
+            unsafe {
+                DLL_MODULE = Some(dll_module);
+            }
         },
         DLL_PROCESS_DETACH => {}
         _ => {}
@@ -26,7 +33,6 @@ extern "system" fn DllMain(_dll_module: HMODULE, call_reason: u32, _: *mut ()) -
     true
 }
 
-const CLSID: &str = "{f3d06e7c-1e45-4a26-847e-f9fcdee59be1}";
 #[no_mangle]
 extern "system" fn DllCanUnloadNow() -> HRESULT {
     S_OK
@@ -93,7 +99,7 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     let def_clsid_path = format!("Software\\Classes\\CLSID\\{0}", CLSID);
     let def_clsid_path = U16CString::from_str(def_clsid_path).unwrap();
     let def_clsid_path_value = U16CString::from_str("RustAmsiProvider").unwrap();
-    let def_clsid_path_value_len = unsafe { (wcslen(def_clsid_path_value.as_ptr()) + 1) * 2 };
+    let def_clsid_path_value_len = unsafe {  ((wcslen(def_clsid_path_value.as_ptr()) + 1) * 2) as u32 };
     let resp = unsafe {
         RegSetKeyValueW(
             HKEY_LOCAL_MACHINE,
@@ -109,11 +115,28 @@ extern "system" fn DllRegisterServer() -> HRESULT {
         return resp;
     }
 
-
     let def_clsid_inproc_path = format!("Software\\Classes\\CLSID\\{0}\\InProcServer32", CLSID);
     let def_clsid_inproc_path = U16CString::from_str(def_clsid_inproc_path).unwrap();
-    let def_clsid_inproc_path_value =
-        U16CString::from_str("C:\\Users\\Administrator\\windows_amsi_provider_rust.dll").unwrap();
+    let def_clsid_inproc_path_value = {
+        if let Some(dll_module) = unsafe { DLL_MODULE } {
+            let mut path = [0u16; MAX_PATH as usize];
+            let len = unsafe {
+                GetModuleFileNameW(
+                    dll_module,
+                    &mut path
+                )
+            };
+            if len != 0 {
+                let path = unsafe { U16CString::from_raw(path.as_mut_ptr()) };
+                path
+            } else {
+                return E_FAIL;
+            }
+        } else {
+            return E_FAIL;
+        }
+    };
+
     let def_clsid_inproc_path_value_len =
         unsafe { (wcslen(def_clsid_inproc_path_value.as_ptr()) + 1) * 2 };
     let resp = unsafe {
