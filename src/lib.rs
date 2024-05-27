@@ -1,15 +1,8 @@
-#![feature(prelude_import)]
-#![feature(print_internals)]
 #![allow(non_snake_case)]
 #[macro_use]
 extern crate std;
-#[prelude_import]
-use std::prelude::rust_2021::*;
 use libc::wcslen;
 use std::ffi::c_void;
-use std::fmt;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::ptr;
@@ -18,14 +11,15 @@ use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Antimalware::*;
 use windows::Win32::System::Com::*;
-use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::System::Registry::*;
 use windows::Win32::System::SystemServices::*;
 
 #[no_mangle]
-extern "system" fn DllMain(dll_module: HMODULE, call_reason: u32, _: *mut ()) -> bool {
+extern "system" fn DllMain(_dll_module: HMODULE, call_reason: u32, _: *mut ()) -> bool {
     match call_reason {
-        DLL_PROCESS_ATTACH => {},
+        DLL_PROCESS_ATTACH => {
+            let _ = env_logger::try_init();
+        },
         DLL_PROCESS_DETACH => {}
         _ => {}
     }
@@ -42,20 +36,15 @@ extern "system" fn DllCanUnloadNow() -> HRESULT {
 struct RustAmsiProvider {}
 impl IAntimalwareProvider_Impl for RustAmsiProvider {
     fn Scan(&self, _stream: Option<&IAmsiStream>) -> Result<AMSI_RESULT> {
-        {
-            ::std::io::_print(format_args!("Scan\n"));
-        };
+        log::info!("IAntimalwareProvider_Impl::Scan");
         Ok(AMSI_RESULT_CLEAN)
     }
     fn CloseSession(&self, _session: u64) {
-        {
-            ::std::io::_print(format_args!("CloseSession\n"));
-        };
+        log::info!("IAntimalwareProvider_Impl::CloseSession");
     }
     fn DisplayName(&self) -> Result<PWSTR> {
-        {
-            ::std::io::_print(format_args!("DisplayName\n"));
-        };
+        log::info!("IAntimalwareProvider_Impl::DisplayName");
+
         Ok(PWSTR(unsafe {
             U16CString::from_str_unchecked("RustAmsiProvider").as_mut_ptr()
         }))
@@ -71,52 +60,37 @@ impl IClassFactory_Impl for RustAmsiProviderFactory {
         riid: *const GUID,
         ppv: *mut *mut c_void,
     ) -> Result<()> {
-        {
-            ::std::io::_print(format_args!("CreateInstance\n"));
-        };
+        log::info!("IClassFactory_Impl::CreateInstance");
         let provider: ManuallyDrop<Pin<Box<RustAmsiProvider_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProvider_Impl::new(RustAmsiProvider {})));
-        unsafe {
-            provider.QueryInterface(riid, ppv);
-        }
-        {
-            ::std::io::_print(format_args!("CreateInstance *ppv: {0:?}\n", unsafe { *ppv }));
+        let _ = unsafe {
+            provider.QueryInterface(riid, ppv)
         };
         Ok(())
     }
     fn LockServer(&self, _lock: BOOL) -> Result<()> {
-        {
-            ::std::io::_print(format_args!("LockServer\n"));
-        };
+        log::info!("IClassFactory_Impl::LockServer");
         Ok(())
     }
 }
+
 #[no_mangle]
 extern "system" fn DllGetClassObject(
-    rclsid: *const GUID,
+    _rclsid: *const GUID,
     riid: *const GUID,
     ppv: *mut *mut c_void,
 ) -> HRESULT {
-    {
-        ::std::io::_print(format_args!("DllGetClassObject\n"));
-    };
+
+    log::info!("DllGetClassObject");
     let factory: ManuallyDrop<Pin<Box<RustAmsiProviderFactory_Impl>>> = ManuallyDrop::new(Box::pin(RustAmsiProviderFactory_Impl::new(RustAmsiProviderFactory {})));
-    unsafe {
-        factory.QueryInterface(riid, ppv);
-    }
-    {
-        ::std::io::_print(format_args!("DllGetClassObject *ppv: {0:?}\n", unsafe { *ppv }));
+    let _ = unsafe {
+        factory.QueryInterface(riid, ppv)
     };
     return S_OK;
 }
+
 #[no_mangle]
 extern "system" fn DllRegisterServer() -> HRESULT {
-    let def_clsid_path = {
-        let res = {
-            let res = fmt::format(format_args!("Software\\Classes\\CLSID\\{0}", CLSID));
-            res
-        };
-        res
-    };
+    let def_clsid_path = format!("Software\\Classes\\CLSID\\{0}", CLSID);
     let def_clsid_path = U16CString::from_str(def_clsid_path).unwrap();
     let def_clsid_path_value = U16CString::from_str("RustAmsiProvider").unwrap();
     let def_clsid_path_value_len = unsafe { (wcslen(def_clsid_path_value.as_ptr()) + 1) * 2 };
@@ -127,23 +101,16 @@ extern "system" fn DllRegisterServer() -> HRESULT {
             PCWSTR(ptr::null()),
             REG_SZ.0,
             Some(def_clsid_path_value.as_ptr() as *const _),
-            ((wcslen(def_clsid_path_value.as_ptr()) + 1) * 2) as u32,
+            def_clsid_path_value_len as u32,
         )
         .to_hresult()
     };
     if resp != S_OK {
         return resp;
     }
-    let def_clsid_inproc_path = {
-        let res = {
-            let res = fmt::format(format_args!(
-                "Software\\Classes\\CLSID\\{0}\\InProcServer32",
-                CLSID
-            ));
-            res
-        };
-        res
-    };
+
+
+    let def_clsid_inproc_path = format!("Software\\Classes\\CLSID\\{0}\\InProcServer32", CLSID);
     let def_clsid_inproc_path = U16CString::from_str(def_clsid_inproc_path).unwrap();
     let def_clsid_inproc_path_value =
         U16CString::from_str("C:\\Users\\Administrator\\windows_amsi_provider_rust.dll").unwrap();
@@ -163,16 +130,8 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     if resp != S_OK {
         return resp;
     }
-    let def_clsid_inproc_threading_path = {
-        let res = {
-            let res = fmt::format(format_args!(
-                "Software\\Classes\\CLSID\\{0}\\InProcServer32",
-                CLSID
-            ));
-            res
-        };
-        res
-    };
+
+    let def_clsid_inproc_threading_path = format!("Software\\Classes\\CLSID\\{0}\\InProcServer32", CLSID);
     let def_clsid_inproc_threading_path =
         U16CString::from_str(def_clsid_inproc_threading_path).unwrap();
     let def_clsid_inproc_threading_key = U16CString::from_str("ThreadingModel").unwrap();
@@ -191,16 +150,8 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     if resp != S_OK {
         return resp;
     }
-    let def_amsi_provider_path = {
-        let res = {
-            let res = fmt::format(format_args!(
-                "Software\\Microsoft\\AMSI\\Providers\\{0}",
-                CLSID
-            ));
-            res
-        };
-        res
-    };
+
+    let def_amsi_provider_path = format!("Software\\Microsoft\\AMSI\\Providers\\{0}", CLSID);
     let def_amsi_provider_path = U16CString::from_str(def_amsi_provider_path).unwrap();
     let def_amsi_provider_path_value = U16CString::from_str("RustAmsiProvider").unwrap();
     let resp = unsafe {
@@ -217,21 +168,14 @@ extern "system" fn DllRegisterServer() -> HRESULT {
     if resp != S_OK {
         return resp;
     }
+
     S_OK
 }
+
 #[no_mangle]
 #[allow(dead_code)]
 extern "system" fn DllUnregisterServer() -> HRESULT {
-    let def_amsi_provider_path = {
-        let res = {
-            let res = fmt::format(format_args!(
-                "Software\\Microsoft\\AMSI\\Providers\\{0}",
-                CLSID
-            ));
-            res
-        };
-        res
-    };
+    let def_amsi_provider_path = format!("Software\\Microsoft\\AMSI\\Providers\\{0}", CLSID);
     let def_amsi_provider_path = U16CString::from_str(def_amsi_provider_path).unwrap();
     let resp = unsafe {
         RegDeleteTreeW(HKEY_LOCAL_MACHINE, PCWSTR(def_amsi_provider_path.as_ptr())).to_hresult()
@@ -239,18 +183,14 @@ extern "system" fn DllUnregisterServer() -> HRESULT {
     if resp != S_OK {
         return resp;
     }
-    let def_clsid_path = {
-        let res = {
-            let res = fmt::format(format_args!("Software\\Classes\\CLSID\\{0}", CLSID));
-            res
-        };
-        res
-    };
+
+    let def_clsid_path = format!("Software\\Classes\\CLSID\\{0}", CLSID);
     let def_clsid_path = U16CString::from_str(def_clsid_path).unwrap();
     let resp =
         unsafe { RegDeleteTreeW(HKEY_LOCAL_MACHINE, PCWSTR(def_clsid_path.as_ptr())).to_hresult() };
     if resp != S_OK {
         return resp;
     }
+
     S_OK
 }
