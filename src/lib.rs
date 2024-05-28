@@ -8,9 +8,12 @@ use std::pin::Pin;
 use std::ptr;
 use widestring::*;
 use windows::core::{implement, IUnknown, IUnknownImpl, Result, GUID, HRESULT, PCWSTR, PWSTR};
-use windows::Win32::Foundation::{BOOL, E_FAIL, HMODULE, MAX_PATH, S_OK};
+use windows::Win32::Foundation::{
+    BOOL, E_FAIL, HMODULE, MAX_PATH, S_OK, ERROR_INSUFFICIENT_BUFFER,
+};
 use windows::Win32::System::Antimalware::{
-    IAmsiStream, IAntimalwareProvider, IAntimalwareProvider_Impl, AMSI_RESULT, AMSI_RESULT_CLEAN,
+    IAmsiStream, IAntimalwareProvider, IAntimalwareProvider_Impl, AMSI_RESULT, AMSI_RESULT_CLEAN, AMSI_ATTRIBUTE_APP_NAME, AMSI_ATTRIBUTE,
+    AMSI_ATTRIBUTE_CONTENT_NAME, AMSI_ATTRIBUTE_CONTENT_SIZE, AMSI_ATTRIBUTE_CONTENT_ADDRESS,
 };
 use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
@@ -45,8 +48,38 @@ extern "system" fn DllCanUnloadNow() -> HRESULT {
 #[implement(IAntimalwareProvider)]
 struct RustAmsiProvider {}
 impl IAntimalwareProvider_Impl for RustAmsiProvider {
-    fn Scan(&self, _stream: Option<&IAmsiStream>) -> Result<AMSI_RESULT> {
+    fn Scan(&self, stream: Option<&IAmsiStream>) -> Result<AMSI_RESULT> {
         log::info!("IAntimalwareProvider_Impl::Scan");
+
+        let stream: &IAmsiStream = stream.as_ref().unwrap();
+
+        let mut app_name: [u8; 1024] = [0u8; 1024];
+        let mut app_name_len = 0;
+        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_APP_NAME, &mut app_name, &mut app_name_len) };
+        let app_name = unsafe { U16CString::from_ptr_truncate(app_name.as_mut_ptr() as *mut u16, app_name_len as usize) };
+        log::info!("App Name: {:?}", app_name);
+
+        let mut content_name: [u8; 1024] = [0u8; 1024];
+        let mut content_name_len = 0;
+        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_NAME, &mut content_name , &mut content_name_len) };
+        let content_name = unsafe { U16CString::from_ptr_truncate(content_name.as_mut_ptr() as *mut u16, content_name_len as usize) };
+        log::info!("Content Name: {:?}", content_name);
+
+        let mut content_size: [u8; 8] = [0u8; 8];
+        let mut content_len = 0;
+        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_SIZE, &mut content_size, &mut content_len) };
+        let content_size = unsafe { usize::from_ne_bytes(content_size) };
+        log::info!("Content Size: {:?}", content_size);
+
+        let mut content_address: [u8; 8] = [0u8; 8];
+        let mut content_address_len = 0;
+        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_ADDRESS, &mut content_address, &mut content_address_len) };
+        let content_address = unsafe { u64::from_ne_bytes(content_address) as *const u16 };
+        log::info!("Content Address: {:?}", content_address);
+
+        let content_str = unsafe { U16CString::from_ptr_truncate(content_address, content_size) };
+        log::info!("Content: {:?}", content_str);
+
         Ok(AMSI_RESULT_CLEAN)
     }
     fn CloseSession(&self, _session: u64) {
