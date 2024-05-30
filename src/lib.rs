@@ -9,11 +9,12 @@ use std::ptr;
 use widestring::*;
 use windows::core::{implement, IUnknown, IUnknownImpl, Result, GUID, HRESULT, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{
-    BOOL, E_FAIL, HMODULE, MAX_PATH, S_OK, ERROR_INSUFFICIENT_BUFFER,
+    BOOL, ERROR_INSUFFICIENT_BUFFER, E_FAIL, HMODULE, MAX_PATH, S_OK,
 };
 use windows::Win32::System::Antimalware::{
-    IAmsiStream, IAntimalwareProvider, IAntimalwareProvider_Impl, AMSI_RESULT, AMSI_RESULT_CLEAN, AMSI_ATTRIBUTE_APP_NAME, AMSI_ATTRIBUTE,
-    AMSI_ATTRIBUTE_CONTENT_NAME, AMSI_ATTRIBUTE_CONTENT_SIZE, AMSI_ATTRIBUTE_CONTENT_ADDRESS,
+    IAmsiStream, IAntimalwareProvider, IAntimalwareProvider_Impl, AMSI_ATTRIBUTE,
+    AMSI_ATTRIBUTE_APP_NAME, AMSI_ATTRIBUTE_CONTENT_ADDRESS, AMSI_ATTRIBUTE_CONTENT_NAME,
+    AMSI_ATTRIBUTE_CONTENT_SIZE, AMSI_RESULT, AMSI_RESULT_CLEAN,
 };
 use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
@@ -45,6 +46,21 @@ extern "system" fn DllCanUnloadNow() -> HRESULT {
     S_OK
 }
 
+fn vbscript_handler() -> Result<AMSI_RESULT> {
+    log::info!("vbscript_handler");
+    Ok(AMSI_RESULT_CLEAN)
+}
+
+fn powershell_handler() -> Result<AMSI_RESULT> {
+    log::info!("powershell_handler");
+    Ok(AMSI_RESULT_CLEAN)
+}
+
+fn jscript_handler() -> Result<AMSI_RESULT> {
+    log::info!("jscript_handler");
+    Ok(AMSI_RESULT_CLEAN)
+}
+
 #[implement(IAntimalwareProvider)]
 struct RustAmsiProvider {}
 impl IAntimalwareProvider_Impl for RustAmsiProvider {
@@ -55,30 +71,77 @@ impl IAntimalwareProvider_Impl for RustAmsiProvider {
 
         let mut app_name: [u8; 1024] = [0u8; 1024];
         let mut app_name_len = 0;
-        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_APP_NAME, &mut app_name, &mut app_name_len) };
-        let app_name = unsafe { U16CString::from_ptr_truncate(app_name.as_mut_ptr() as *mut u16, app_name_len as usize) };
+        let resp = unsafe {
+            &stream.GetAttribute(AMSI_ATTRIBUTE_APP_NAME, &mut app_name, &mut app_name_len)
+        };
+        let app_name = unsafe {
+            U16CString::from_ptr_truncate(app_name.as_mut_ptr() as *mut u16, app_name_len as usize)
+        };
         log::info!("App Name: {:?}", app_name);
 
         let mut content_name: [u8; 1024] = [0u8; 1024];
         let mut content_name_len = 0;
-        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_NAME, &mut content_name , &mut content_name_len) };
-        let content_name = unsafe { U16CString::from_ptr_truncate(content_name.as_mut_ptr() as *mut u16, content_name_len as usize) };
+        let resp = unsafe {
+            &stream.GetAttribute(
+                AMSI_ATTRIBUTE_CONTENT_NAME,
+                &mut content_name,
+                &mut content_name_len,
+            )
+        };
+        let content_name = unsafe {
+            U16CString::from_ptr_truncate(
+                content_name.as_mut_ptr() as *mut u16,
+                content_name_len as usize,
+            )
+        };
         log::info!("Content Name: {:?}", content_name);
 
         let mut content_size: [u8; 8] = [0u8; 8];
         let mut content_len = 0;
-        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_SIZE, &mut content_size, &mut content_len) };
+        let resp = unsafe {
+            &stream.GetAttribute(
+                AMSI_ATTRIBUTE_CONTENT_SIZE,
+                &mut content_size,
+                &mut content_len,
+            )
+        };
         let content_size = unsafe { usize::from_ne_bytes(content_size) };
         log::info!("Content Size: {:?}", content_size);
 
         let mut content_address: [u8; 8] = [0u8; 8];
         let mut content_address_len = 0;
-        let resp = unsafe { &stream.GetAttribute(AMSI_ATTRIBUTE_CONTENT_ADDRESS, &mut content_address, &mut content_address_len) };
+        let resp = unsafe {
+            &stream.GetAttribute(
+                AMSI_ATTRIBUTE_CONTENT_ADDRESS,
+                &mut content_address,
+                &mut content_address_len,
+            )
+        };
         let content_address = unsafe { u64::from_ne_bytes(content_address) as *const u16 };
         log::info!("Content Address: {:?}", content_address);
 
         let content_str = unsafe { U16CString::from_ptr_truncate(content_address, content_size) };
         log::info!("Content: {:?}", content_str);
+
+        let app_name = app_name.to_string_lossy().to_lowercase();
+        let content_name = content_name.to_string_lossy().to_lowercase();
+        let content_str = content_str.to_string_lossy().to_lowercase();
+        if app_name.contains("vbscript")
+            || content_name.contains("vbscript")
+            || content_str.contains("vbscript")
+        {
+            return vbscript_handler();
+        } else if app_name.contains("powershell")
+            || content_name.contains("powershell")
+            || content_str.contains("powershell")
+        {
+            return powershell_handler();
+        } else if app_name.contains("jscript")
+            || content_name.contains("jscript")
+            || content_str.contains("jscript")
+        {
+            return jscript_handler();
+        }
 
         Ok(AMSI_RESULT_CLEAN)
     }
