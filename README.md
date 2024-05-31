@@ -31,6 +31,10 @@ regsvr32.exe -u <path-to-amsi-provider.dll>
 ```
 see `DllUnregisterServer` in `lib.rs` for more details.
 
+## todo
+
+- [ ] load sigma rules from a file into some data structure
+
 ## references
 
 * https://learn.microsoft.com/en-us/windows/win32/amsi
